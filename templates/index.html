@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr !important; } .kpi-grid { grid-template-columns: 1fr 1fr !important; } }
+  </style>
+{% endblock %}
+{% block content %}
+  {% if not model_loaded %}
+    <div class="alert alert-warning">
+      <span aria-hidden="true">⚠️</span>
+      <div>
+        <strong>Model not loaded.</strong> Put <code class="mono">WA_Fn-UseC_-HR-Employee-Attrition.csv</code> in this folder, run <code class="mono">python train_model.py</code>, then restart the app.
+      </div>
+    </div>
+  {% else %}
+    <div class="card description-panel" style="margin-bottom: 2rem; padding: 1.5rem 1.75rem;">
+      <div class="card-title" style="margin-bottom: 0.75rem;">About this project</div>
+      <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.65; margin-bottom: 1rem;">
+        <strong style="color: var(--text);">Promotion Predictor</strong> uses the IBM HR Analytics dataset to predict whether an employee is <strong style="color: var(--success);">likely promoted</strong> (YearsSinceLastPromotion = 0) or <strong style="color: var(--text-secondary);">not</strong>. The model uses job, satisfaction, tenure, and demographic features with a Logistic Regression pipeline (StandardScaler + OneHotEncoder).
+      </p>
+      <div class="card-title" style="font-size: 0.8rem; margin-bottom: 0.5rem;">How it works</div>
+      <ol style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; margin: 0 0 1rem 1.25rem; padding: 0;">
+        <li><strong style="color: var(--text);">Target</strong> — Promoted = 1 if YearsSinceLastPromotion is 0, else 0.</li>
+        <li><strong style="color: var(--text);">Features</strong> — All columns except Promoted, YearsSinceLastPromotion, and EmployeeNumber; numerical columns are scaled, categorical one-hot encoded.</li>
+        <li><strong style="color: var(--text);">Model</strong> — Preprocessor + Logistic Regression, trained on 80% of the data.</li>
+        <li><strong style="color: var(--text);">Predict</strong> — Enter employee attributes in <a href="{{ url_for('predict') }}" style="color: var(--accent);">Predict promotion</a> to get a promotion probability.</li>
+      </ol>
+      <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+        The <strong style="color: var(--text);">Dashboard</strong> below summarizes the dataset. Use <strong style="color: var(--text);">Predict promotion</strong> to score an employee profile.
+      </p>
+    </div>
+
+    {% if stats %}
+      <div class="page-header" style="margin-bottom: 1.75rem;">
+        <h1 style="font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em;">Overview</h1>
+        <p class="muted" style="margin-top: 0.25rem;">Employee dataset and promotion metrics</p>
+      </div>
+      <div class="kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div class="card" style="border-left: 3px solid var(--accent);">
+          <div class="card-title">Total employees</div>
+          <div style="font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums;">{{ "{:,}".format(stats.total_employees) }}</div>
+        </div>
+        <div class="card" style="border-left: 3px solid var(--success);">
+          <div class="card-title">Promoted (YSLP=0)</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: var(--success); font-variant-numeric: tabular-nums;">{{ "{:,}".format(stats.promoted_count) }}</div>
+        </div>
+        <div class="card" style="border-left: 3px solid var(--warning);">
+          <div class="card-title">Promotion rate</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: var(--warning); font-variant-numeric: tabular-nums;">{{ stats.promotion_rate_pct }}%</div>
+        </div>
+      </div>
+      {% if stats.dept_labels and stats.dept_counts %}
+      <div class="card" style="padding: 1.5rem;">
+        <div class="card-title">By department</div>
+        <div style="height: 220px;">
+          <canvas id="chartDept" aria-label="Employees by department"></canvas>
+        </div>
+      </div>
+      <script>
+        (function() {
+          const deptLabels = {{ stats.dept_labels | tojson }};
+          const deptCounts = {{ stats.dept_counts | tojson }};
+          const colors = ['#4f7cf6', '#12b76a', '#f79009'];
+          if (deptLabels.length && document.getElementById('chartDept')) {
+            new Chart(document.getElementById('chartDept'), {
+              type: 'bar',
+              data: { labels: deptLabels, datasets: [{ label: 'Employees', data: deptCounts, backgroundColor: colors.slice(0, deptLabels.length), borderRadius: 6 }] },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#9ca3b4' } }, x: { grid: { display: false }, ticks: { color: '#9ca3b4' } } } }
+            });
+          }
+        })();
+      </script>
+      {% endif %}
+    {% else %}
+      <p class="muted">No <code class="mono">WA_Fn-UseC_-HR-Employee-Attrition.csv</code> in this folder.</p>
+    {% endif %}
+    <div style="margin-top: 1.5rem;">
+      <a href="{{ url_for('predict') }}" class="btn btn-primary">
+        Predict promotion
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  {% endif %}
+{% endblock %}

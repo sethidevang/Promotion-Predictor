@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Predict promotion{% endblock %}
+{% block head %}
+  <style>
+    .form-section { margin-bottom: 2rem; }
+    .form-section-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .result-card { padding: 1.75rem; border-radius: var(--radius); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+    .result-card.promoted { background: var(--success-muted); border: 1px solid rgba(18, 183, 106, 0.4); }
+    .result-card.not-promoted { background: var(--surface); border: 1px solid var(--border); }
+    .result-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .result-card.promoted .result-icon { background: rgba(18, 183, 106, 0.25); color: var(--success); }
+    .result-card.not-promoted .result-icon { background: var(--accent-muted); color: var(--accent); }
+    .result-label { font-size: 1.25rem; font-weight: 700; }
+    .btn-loading { position: relative; color: transparent !important; }
+    .btn-loading::after { content: ''; position: absolute; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+{% endblock %}
+{% block content %}
+  {% if not model_loaded %}
+    <div class="alert alert-warning">
+      <span aria-hidden="true">⚠️</span>
+      <div><strong>Model not loaded.</strong> Run <code class="mono">python train_model.py</code> in this folder first.</div>
+    </div>
+  {% else %}
+    <div class="page-header" style="margin-bottom: 1.5rem;">
+      <h1 style="font-size: 1.5rem; font-weight: 700;">Predict promotion</h1>
+      <p class="muted" style="margin-top: 0.25rem;">Enter employee attributes to get promotion probability</p>
+    </div>
+    {% if error %}<div class="alert alert-danger"><span aria-hidden="true">✕</span><div>{{ error }}</div></div>{% endif %}
+    {% if result %}
+      <div class="result-card {{ 'promoted' if result.raw == 1 else 'not-promoted' }}" role="status">
+        <div class="result-icon">
+          {% if result.raw == 1 %}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          {% else %}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {% endif %}
+        </div>
+        <div>
+          <div class="result-label">{{ result.label }}</div>
+          <div class="muted" style="font-size: 0.85rem;">Promotion probability: <strong style="color: var(--text);">{{ result.promotion_probability }}%</strong></div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="card">
+      <form method="post" action="{{ url_for('predict') }}" id="predictForm">
+        <div class="form-section">
+          <div class="form-section-title">Demographics & role</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Age</label><input type="number" name="Age" value="{{ request.form.get('Age') or '35' }}" min="18" max="100"></div>
+            <div class="form-group"><label>Gender</label><select name="Gender"><option value="Female" {{ 'selected' if request.form.get('Gender') == 'Female' else '' }}>Female</option><option value="Male" {{ 'selected' if request.form.get('Gender') == 'Male' else '' }}>Male</option></select></div>
+            <div class="form-group"><label>MaritalStatus</label><select name="MaritalStatus"><option value="Single" {{ 'selected' if request.form.get('MaritalStatus') == 'Single' else '' }}>Single</option><option value="Married" {{ 'selected' if request.form.get('MaritalStatus') == 'Married' else '' }}>Married</option><option value="Divorced" {{ 'selected' if request.form.get('MaritalStatus') == 'Divorced' else '' }}>Divorced</option></select></div>
+            <div class="form-group"><label>Education</label><input type="number" name="Education" value="{{ request.form.get('Education') or '3' }}" min="1" max="5"></div>
+            <div class="form-group"><label>EducationField</label><select name="EducationField">
+              <option value="Life Sciences" {{ 'selected' if request.form.get('EducationField') == 'Life Sciences' else '' }}>Life Sciences</option>
+              <option value="Medical" {{ 'selected' if request.form.get('EducationField') == 'Medical' else '' }}>Medical</option>
+              <option value="Marketing" {{ 'selected' if request.form.get('EducationField') == 'Marketing' else '' }}>Marketing</option>
+              <option value="Technical Degree" {{ 'selected' if request.form.get('EducationField') == 'Technical Degree' else '' }}>Technical Degree</option>
+              <option value="Other" {{ 'selected' if request.form.get('EducationField') == 'Other' else '' }}>Other</option>
+              <option value="Human Resources" {{ 'selected' if request.form.get('EducationField') == 'Human Resources' else '' }}>Human Resources</option>
+            </select></div>
+            <div class="form-group"><label>Department</label><select name="Department">
+              <option value="Research & Development" {{ 'selected' if request.form.get('Department') == 'Research & Development' else '' }}>Research & Development</option>
+              <option value="Sales" {{ 'selected' if request.form.get('Department') == 'Sales' else '' }}>Sales</option>
+              <option value="Human Resources" {{ 'selected' if request.form.get('Department') == 'Human Resources' else '' }}>Human Resources</option>
+            </select></div>
+            <div class="form-group"><label>JobRole</label><select name="JobRole">
+              <option value="Research Scientist" {{ 'selected' if request.form.get('JobRole') == 'Research Scientist' else '' }}>Research Scientist</option>
+              <option value="Laboratory Technician" {{ 'selected' if request.form.get('JobRole') == 'Laboratory Technician' else '' }}>Laboratory Technician</option>
+              <option value="Sales Executive" {{ 'selected' if request.form.get('JobRole') == 'Sales Executive' else '' }}>Sales Executive</option>
+              <option value="Sales Representative" {{ 'selected' if request.form.get('JobRole') == 'Sales Representative' else '' }}>Sales Representative</option>
+              <option value="Manager" {{ 'selected' if request.form.get('JobRole') == 'Manager' else '' }}>Manager</option>
+              <option value="Manufacturing Director" {{ 'selected' if request.form.get('JobRole') == 'Manufacturing Director' else '' }}>Manufacturing Director</option>
+              <option value="Healthcare Representative" {{ 'selected' if request.form.get('JobRole') == 'Healthcare Representative' else '' }}>Healthcare Representative</option>
+              <option value="Research Director" {{ 'selected' if request.form.get('JobRole') == 'Research Director' else '' }}>Research Director</option>
+              <option value="Human Resources" {{ 'selected' if request.form.get('JobRole') == 'Human Resources' else '' }}>Human Resources</option>
+            </select></div>
+            <div class="form-group"><label>JobLevel</label><input type="number" name="JobLevel" value="{{ request.form.get('JobLevel') or '2' }}" min="1" max="5"></div>
+            <div class="form-group"><label>Attrition</label><select name="Attrition"><option value="No" {{ 'selected' if request.form.get('Attrition') == 'No' else '' }}>No</option><option value="Yes" {{ 'selected' if request.form.get('Attrition') == 'Yes' else '' }}>Yes</option></select></div>
+            <div class="form-group"><label>BusinessTravel</label><select name="BusinessTravel"><option value="Travel_Rarely" {{ 'selected' if request.form.get('BusinessTravel') == 'Travel_Rarely' else '' }}>Travel_Rarely</option><option value="Travel_Frequently" {{ 'selected' if request.form.get('BusinessTravel') == 'Travel_Frequently' else '' }}>Travel_Frequently</option><option value="Non-Travel" {{ 'selected' if request.form.get('BusinessTravel') == 'Non-Travel' else '' }}>Non-Travel</option></select></div>
+            <div class="form-group"><label>OverTime</label><select name="OverTime"><option value="No" {{ 'selected' if request.form.get('OverTime') == 'No' else '' }}>No</option><option value="Yes" {{ 'selected' if request.form.get('OverTime') == 'Yes' else '' }}>Yes</option></select></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Pay & rates</div>
+          <div class="form-grid">
+            <div class="form-group"><label>DailyRate</label><input type="number" name="DailyRate" value="{{ request.form.get('DailyRate') or '800' }}" min="100" step="1"></div>
+            <div class="form-group"><label>HourlyRate</label><input type="number" name="HourlyRate" value="{{ request.form.get('HourlyRate') or '65' }}" min="30" step="1"></div>
+            <div class="form-group"><label>MonthlyIncome</label><input type="number" name="MonthlyIncome" value="{{ request.form.get('MonthlyIncome') or '5000' }}" min="1000" step="1"></div>
+            <div class="form-group"><label>MonthlyRate</label><input type="number" name="MonthlyRate" value="{{ request.form.get('MonthlyRate') or '20000' }}" min="2000" step="1"></div>
+            <div class="form-group"><label>PercentSalaryHike</label><input type="number" name="PercentSalaryHike" value="{{ request.form.get('PercentSalaryHike') or '14' }}" min="11" max="25"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Satisfaction (1–4)</div>
+          <div class="form-grid">
+            <div class="form-group"><label>EnvironmentSatisfaction</label><input type="number" name="EnvironmentSatisfaction" value="{{ request.form.get('EnvironmentSatisfaction') or '3' }}" min="1" max="4"></div>
+            <div class="form-group"><label>JobSatisfaction</label><input type="number" name="JobSatisfaction" value="{{ request.form.get('JobSatisfaction') or '3' }}" min="1" max="4"></div>
+            <div class="form-group"><label>RelationshipSatisfaction</label><input type="number" name="RelationshipSatisfaction" value="{{ request.form.get('RelationshipSatisfaction') or '3' }}" min="1" max="4"></div>
+            <div class="form-group"><label>WorkLifeBalance</label><input type="number" name="WorkLifeBalance" value="{{ request.form.get('WorkLifeBalance') or '3' }}" min="1" max="4"></div>
+            <div class="form-group"><label>JobInvolvement</label><input type="number" name="JobInvolvement" value="{{ request.form.get('JobInvolvement') or '3' }}" min="1" max="4"></div>
+            <div class="form-group"><label>PerformanceRating</label><input type="number" name="PerformanceRating" value="{{ request.form.get('PerformanceRating') or '3' }}" min="1" max="4"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Tenure & experience</div>
+          <div class="form-grid">
+            <div class="form-group"><label>DistanceFromHome</label><input type="number" name="DistanceFromHome" value="{{ request.form.get('DistanceFromHome') or '9' }}" min="1" max="30"></div>
+            <div class="form-group"><label>NumCompaniesWorked</label><input type="number" name="NumCompaniesWorked" value="{{ request.form.get('NumCompaniesWorked') or '2' }}" min="0" max="10"></div>
+            <div class="form-group"><label>TotalWorkingYears</label><input type="number" name="TotalWorkingYears" value="{{ request.form.get('TotalWorkingYears') or '11' }}" min="0" max="40"></div>
+            <div class="form-group"><label>YearsAtCompany</label><input type="number" name="YearsAtCompany" value="{{ request.form.get('YearsAtCompany') or '7' }}" min="0" max="40"></div>
+            <div class="form-group"><label>YearsInCurrentRole</label><input type="number" name="YearsInCurrentRole" value="{{ request.form.get('YearsInCurrentRole') or '4' }}" min="0" max="20"></div>
+            <div class="form-group"><label>YearsWithCurrManager</label><input type="number" name="YearsWithCurrManager" value="{{ request.form.get('YearsWithCurrManager') or '4' }}" min="0" max="20"></div>
+            <div class="form-group"><label>TrainingTimesLastYear</label><input type="number" name="TrainingTimesLastYear" value="{{ request.form.get('TrainingTimesLastYear') or '3' }}" min="0" max="6"></div>
+            <div class="form-group"><label>StockOptionLevel</label><input type="number" name="StockOptionLevel" value="{{ request.form.get('StockOptionLevel') or '1' }}" min="0" max="3"></div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Predict</button>
+      </form>
+    </div>
+    <script>
+      document.getElementById('predictForm').addEventListener('submit', function() {
+        var btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+      });
+    </script>
+  {% endif %}
+{% endblock %}

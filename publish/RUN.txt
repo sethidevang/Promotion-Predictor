@@ -1,0 +1,1 @@
+cd HR/publish, then pip install -r requirements.txt and flask run. The app will use pipeline.pkl and feature_columns.pkl in that folder.
